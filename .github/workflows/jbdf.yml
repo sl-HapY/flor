@@ -1,0 +1,61 @@
+name: Download & Split Florence-2 Model
+
+on:
+  workflow_dispatch:  # دستی اجرا می‌شود
+
+jobs:
+  split-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install huggingface_hub
+        run: pip install huggingface_hub
+
+      - name: Download Florence-2 base model
+        run: |
+          python -c "
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              'microsoft/Florence-2-base',
+              local_dir='./florence_model',
+              local_dir_use_symlinks=False
+          )
+          "
+
+      - name: Install rar (non‑free but available)
+        run: sudo apt-get install -y rar
+
+      - name: Create split RAR archives (90 MB parts)
+        run: |
+          # -v90M  →  هر پارت ۹۰ مگابایت
+          # -m0    →  بدون فشرده‌سازی (سریع‌تر)
+          # -ep1   →  مسیر پایه را از نام فایل‌ها حذف کند
+          rar a -v90M -m0 -ep1 model_parts.rar florence_model/
+
+      - name: Remove original folder to avoid huge git stage
+        run: rm -rf florence_model/
+
+      - name: Push to orphan branch (model-parts)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # یک branch یتیم می‌سازیم (بدون تاریخچه‌ی قبلی)
+          git checkout --orphan model-parts
+          git rm -rf .
+
+          # فقط فایل‌های rar را اضافه می‌کنیم
+          git add *.rar
+          git commit -m "Add Florence-2 base split RARs"
+
+          # با force پوش می‌کنیم (چون branch تازه است)
+          git push origin model-parts --force
