@@ -1,7 +1,10 @@
 name: Download & Split Florence-2 Model
 
 on:
-  workflow_dispatch:  # دستی اجرا می‌شود
+  workflow_dispatch:
+
+permissions:
+  contents: write   # ← این خط را اضافه کنید
 
 jobs:
   split-and-push:
@@ -31,14 +34,11 @@ jobs:
           )
           "
 
-      - name: Install rar (non‑free but available)
+      - name: Install rar
         run: sudo apt-get install -y rar
 
       - name: Create split RAR archives (90 MB parts)
         run: |
-          # -v90M  →  هر پارت ۹۰ مگابایت
-          # -m0    →  بدون فشرده‌سازی (سریع‌تر)
-          # -ep1   →  مسیر پایه را از نام فایل‌ها حذف کند
           rar a -v90M -m0 -ep1 model_parts.rar florence_model/
 
       - name: Remove original folder to avoid huge git stage
@@ -49,13 +49,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # یک branch یتیم می‌سازیم (بدون تاریخچه‌ی قبلی)
           git checkout --orphan model-parts
           git rm -rf .
 
-          # فقط فایل‌های rar را اضافه می‌کنیم
           git add *.rar
           git commit -m "Add Florence-2 base split RARs"
 
-          # با force پوش می‌کنیم (چون branch تازه است)
           git push origin model-parts --force
